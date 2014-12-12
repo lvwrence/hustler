@@ -6,7 +6,7 @@
 
     // Enforcing
     "bitwise"       : true,     // true: Prohibit bitwise operators (&, |, ^, etc.)
-    "camelcase"     : false,    // true: Identifiers must be in camelCase
+    "camelcase"     : true,     // true: Identifiers must be in camelCase
     "curly"         : true,     // true: Require {} for every new block or scope
     "eqeqeq"        : true,     // true: Require triple equals (===) for comparison
     "forin"         : true,     // true: Require filtering for..in loops with obj.hasOwnProperty()
@@ -72,7 +72,7 @@
     "jquery"        : false,    // jQuery
     "mocha"         : true,     // Mocha
     "mootools"      : false,    // MooTools
-    "node"          : false,    // Node.js
+    "node"          : true,     // Node.js
     "nonstandard"   : false,    // Widely adopted globals (escape, unescape, etc)
     "prototypejs"   : false,    // Prototype and Scriptaculous
     "qunit"         : false,    // QUnit
