@@ -9,7 +9,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": {
+    "name": "Lawrence Wu",
+    "email": "lawrence@lawrencewu.me",
+    "url": "http://lawrencewu.me/"
+  },
   "license": "ISC",
   "dependencies": {
     "tough-cookie-filestore": "0.0.1",
