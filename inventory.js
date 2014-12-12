@@ -1,150 +1,170 @@
-var fs = require('fs');
+/*
+ * inventory.js
+ *
+ * Functions for grabbing an account's inventory.
+ *
+ * TODO:
+ *  - have updateInventory() take in a user account
+ *  - use mongodb user accounts to fetch cookies
+ *  - refactor stuff out into own functions
+ */
+
 var request = require("request");
-var FileCookieStore = require('tough-cookie-filestore');
+var Item = require("./schemas").Item;
 
-var j = request.jar(new FileCookieStore('cookies.json'));
+function updateInventory(callback) {
+  "use strict";
+  var jar = getCookieJar();
+  var url = getInventoryUrl();
 
-var Item = require('./schemas').Item;
+  // set default cookie jar of request
+  request = request.defaults({jar:jar});
 
-// USE BIND!!!! LOL
+  // send initial request to main inventory page
+  request(url, function(error, response, body) {
+    var data = getData(body);
+    var endpoints = getEndpoints(data);
 
-function update_inventory() {
-  // get cookie jar from file
+    //var endpointNumber = Object.keys(endpoints).length;
+    var endpointCount = 0;
+    for (var i = 0; i < endpoints.length; i++) {
+      queryEndpoint(endpoints[i], function() {
+        endpointCount++;
+        if (endpointCount === endpoints.length) {
+          callback();
+        }
+      });
+    }
+  });
+}
 
-  var url = "http://steamcommunity.com/id/lawrencewu/inventory/";
-  
-  request({url: url, jar: j}, function(error, response, body) {
-    var re = /var g_rgAppContextData.*/;
-    eval(body.match(re)[0]);
-    var data = g_rgAppContextData;
+// TODO: rewrite without using eval
+// parses and gets steam
+function getData(body) {
+  "use strict";
+  var re = /var g_rgAppContextData.*/;
+  var line = body.match(re)[0];
 
-    var applength = Object.keys(data).length;
-    var appcounter = 0;
+  var data = JSON.parse(line.substring(25, line.length - 1));
 
-    for (var appid in data) {
-      // gotta find items for those games now
-      // http://steamcommunity.com/id/lawrencewu/inventory/json/appid/context
-      // e.g.
-      // http://steamcommunity.com/id/lawrencewu/inventory/json/753/7/
-      var contexts = data[appid]['rgContexts'];
+  return data;
+}
 
-      var contextlength = Object.keys(contexts).length;
-      var contextcounter = 0;
+// gets cookie jar to use for request
+function getCookieJar() {
+  "use strict";
+  var FileCookieStore = require("tough-cookie-filestore");
+  var j = request.jar(new FileCookieStore("cookies.json"));
+  return j;
+}
 
-      for (var context in contexts) {
-          var jsonurl = url + 'json/' + appid + '/' + context;
+// TODO: use account to build URL
+function getInventoryUrl() {
+  "use strict";
+  return "http://steamcommunity.com/id/lawrencewu/inventory/";
+}
 
-          request({url: jsonurl, jar: j}, function(contextid, err, resp, bod) {
-            var data = JSON.parse(bod);
-            var item_dict = data["rgInventory"];
-            var desc_dict = data["rgDescriptions"];
-            var items = [];
+// given data obtained from parsed source code, gather inventory endpoints
+function getEndpoints(data) {
+  "use strict";
 
-            var itemlength = Object.keys(item_dict).length;
-            var itemcounter = 0;
+  var arr = [];
 
+  // for every game (e.g. counter-strike, dota)...
+  for (var appId in data) {
+    if (data.hasOwnProperty(appId)) {
+      var contexts = data[appId].rgContexts;
 
-            for (var id in item_dict) {
-              var item = new Item();
+      // look through each context (e.g. coupons, gifts)...
+      for (var contextId in contexts) {
+        if (contexts.hasOwnProperty(contextId)) {
 
-              var classid = item_dict[id]['classid'];
-              var instanceid = item_dict[id]['instanceid'];
-              var amount = item_dict[id]['amount'];
-
-              item.id = id;
-              item.contextid = contextid;
-              item.classid = classid;
-              item.instanceid = instanceid;
-              item.amount = amount;
-
-              var descKey = classid + '_' + instanceid;
-
-              var name = desc_dict[descKey]['name'];
-              var app_id = desc_dict[descKey]['appid'];
-              var marketable = desc_dict[descKey]['marketable'];
-
-              item.appid = app_id;
-              item.name = name;
-              item.marketable = marketable;
-
-              item.save(function(err, reply) {
-                  if (err) return console.error(err);
-                  //counter++;
-                  //if (counter == length) {
-                      //mongoose.connection.close();
-                  //}
-                });
-            }
-        }.bind(undefined, context));
+          // build the json endpoint
+          var endpoint = buildInventoryEndpoint(appId, contextId);
+          arr.push(endpoint);
+        }
       }
     }
-  });
+  }
+
+  return arr;
 }
 
+// builds an inventory json api endpoint with the following format:
+// http://steamcommunity.com/id/lawrencewu/inventory/json/<appid>/<context>
+function buildInventoryEndpoint(appid, contextid) {
+  "use strict";
+  var url = getInventoryUrl();
 
-// calls back with an array of Items.
-function get_items(url, callback) {
-  request({url: url, jar: j}, function(error, response, body) {
+  var jsonurl = url + "json" + "/" + appid + "/" + contextid;
+  return jsonurl;
+}
+
+function queryEndpoint(url, callback) {
+  "use strict";
+  request(url, function(error, response, body) {
     var data = JSON.parse(body);
-    var item_dict = data["rgInventory"];
-    var desc_dict = data["rgDescriptions"];
-    var items = [];
 
-    for (var id in item_dict) {
-      var item = new Item();
+    var items = data.rgInventory;
+    var descriptions = data.rgDescriptions;
 
-      var classid = item_dict[id]['classid'];
-      var instanceid = item_dict[id]['instanceid'];
-      var amount = item_dict[id]['amount'];
+    var itemNumber = Object.keys(items).length;
+    var itemCount = 0;
 
-      item.id = id;
-      item.classid = classid;
-      item.instanceid = instanceid;
-      item.amount = amount;
+    if (itemNumber === 0) { callback(); }
 
-      var descKey = classid + '_' + instanceid;
+    for (var id in items) {
+      if (items.hasOwnProperty(id)) {
+        var item = buildItem(items, descriptions, id);
 
+        item.save(function(err) {
+          if (err) { return console.error(err); }
 
-      var name = desc_dict[descKey]['name'];
-      var marketable = desc_dict[descKey]['marketable'];
-
-      item.name = name;
-      item.marketable = marketable;
-      items.push(item);
-    }
-
-    callback(items);
-  });
-}
-
-
-var mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost/hustler');
-
-var db = mongoose.connection;
-
-db.once('open', function() {
-
-    update_inventory();
-/*
-    get_items("http://steamcommunity.com/id/lawrencewu/inventory/json/730/2/", function(items) {
-
-      var length = items.length;
-
-      // go through list, saving to db, then closing when counter reaches end
-      var counter = 0;
-      for (var i = 0; i < length; i++) {
-        items[i].save(function(err, reply) {
-          if (err) return console.error(err);
-
-          counter++;
-          if (counter == length) {
-              mongoose.connection.close();
+          itemCount++;
+          if (itemCount === itemNumber) {
+            callback();
           }
         });
       }
-    });
-    */
+    }
+  });
+}
+
+function buildItem(items, descriptions, id) {
+  "use strict";
+  var item = new Item();
+  var classId = items[id].classid;
+  var instanceId = items[id].instanceid;
+
+  item.id = id;
+  item.contextId = 44;
+  item.classId = classId;
+  item.instanceId = instanceId;
+  item.amount = items[id].amount;
+
+  var descriptionKey = buildDescriptionKey(classId, instanceId);
+
+  item.name = descriptions[descriptionKey].name;
+  item.appId = descriptions[descriptionKey].appid;
+  item.marketable = descriptions[descriptionKey].marketable;
+
+  return item;
+}
+
+// the description key
+function buildDescriptionKey(classid, instanceid) {
+  "use strict";
+  return classid + "_" + instanceid;
+}
+
+
+var mongoose = require("mongoose");
+mongoose.connect("mongodb://localhost/hustler");
+var db = mongoose.connection;
+db.once("open", function() {
+  "use strict";
+  updateInventory(function() {
+    console.log("done");
+    mongoose.connection.close();
+  });
 });
-
-
