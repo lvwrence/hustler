@@ -1,15 +1,15 @@
 var mongoose = require('mongoose');
 
 var Schema = mongoose.Schema;
-  
+
 // inventory item
 var itemSchema = new Schema({
   id: {type: Number, unique: true, required: true},
   name: {type: String, required: true},
-  appid: {type: Number, required: true},
-  contextid: {type: Number, required: true},
-  classid: {type: Number, required: true},
-  instanceid: {type: Number, required: true},
+  appId: {type: Number, required: true},
+  contextId: {type: Number, required: true},
+  classId: {type: Number, required: true},
+  instanceId: {type: Number, required: true},
   amount: {type: Number, required: true},
   marketable: {type: Boolean, required: true, index: true}
 });
