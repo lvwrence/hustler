@@ -23,6 +23,7 @@
     "redis": "~0.12.1",
     "mongoose": "~3.8.19",
     "request-debug": "~0.1.1",
-    "jshint": "~2.5.10"
+    "jshint": "~2.5.10",
+    "cheerio": "~0.18.0"
   }
 }
